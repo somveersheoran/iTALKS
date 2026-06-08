@@ -4,6 +4,10 @@ import './App.css';
 
 const servers = { iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }] };
 
+// 🛑 DYNAMIC API URLs (Localhost hat gaya!)
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+const WS_BASE_URL = API_BASE_URL.replace(/^http/, 'ws');
+
 function App() {
   const [currentUser, setCurrentUser] = useState(null);
   
@@ -50,19 +54,19 @@ function App() {
   const requestOTP = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch("http://127.0.0.1:8000/send-otp", {
+      const res = await fetch(`${API_BASE_URL}/send-otp`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: countryCode + authPhone })
       });
       if(res.ok) setAuthStep(2);
-      else alert("Failed to send OTP");
-    } catch (err) { alert("Server error: FastAPI is not running."); }
+      else alert("Failed to send OTP. Check backend.");
+    } catch (err) { alert("Server error: FastAPI is not running or CORS issue."); console.error(err); }
   };
 
   const verifyOTP = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch("http://127.0.0.1:8000/verify-otp", {
+      const response = await fetch(`${API_BASE_URL}/verify-otp`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: countryCode + authPhone, otp: authOtp, username: authUsername })
       });
@@ -79,7 +83,7 @@ function App() {
         setCurrentUser(data);
         setAboutText(data.about || "Hey! I am using iTALKS");
       }
-    } catch (err) { alert("Server error. Please check FastAPI terminal."); }
+    } catch (err) { alert("Server error. Please check backend."); console.error(err); }
   };
 
   // ==========================================
@@ -93,7 +97,7 @@ function App() {
       reader.onloadend = async () => {
         const base64Image = reader.result;
         setCurrentUser(prev => ({ ...prev, avatar: base64Image }));
-        await fetch("http://127.0.0.1:8000/update-profile", {
+        await fetch(`${API_BASE_URL}/update-profile`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ user_id: currentUser.clientId, avatar: base64Image })
         });
@@ -104,7 +108,7 @@ function App() {
   const saveAboutText = async () => {
     setIsEditingAbout(false);
     setCurrentUser(prev => ({ ...prev, about: aboutText }));
-    await fetch("http://127.0.0.1:8000/update-profile", {
+    await fetch(`${API_BASE_URL}/update-profile`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: currentUser.clientId, about: aboutText })
     });
@@ -129,17 +133,17 @@ function App() {
   useEffect(() => {
     if (!currentUser) return;
     
-    fetch("http://127.0.0.1:8000/messages")
+    fetch(`${API_BASE_URL}/messages`)
       .then(res => res.json())
       .then(data => setMessages(data.map(m => ({...m, sender: String(m.clientId) === String(currentUser.clientId) ? 'me' : 'them'}))))
       .catch(console.error);
       
-    fetch("http://127.0.0.1:8000/statuses")
+    fetch(`${API_BASE_URL}/statuses`)
       .then(res => res.json())
       .then(setStatuses)
       .catch(console.error);
 
-    ws.current = new WebSocket("ws://127.0.0.1:8000/ws");
+    ws.current = new WebSocket(`${WS_BASE_URL}/ws`);
     ws.current.onmessage = async (event) => {
       const data = JSON.parse(event.data);
 
@@ -148,18 +152,14 @@ function App() {
       } else if (data.type === "new_status") {
         setStatuses(prev => [data, ...prev]);
       } else {
-        // Handle incoming chat messages
         if (['text', 'audio', 'image'].includes(data.type)) {
-          // Check if the message is NOT from yourself
           if (String(data.clientId) !== String(currentUser.clientId)) {
             setMessages(prev => [...prev, { ...data, sender: 'them' }]);
-            // Send read receipt back to sender
             if (data.id) {
               ws.current.send(JSON.stringify({ type: "read_receipt", message_id: data.id }));
             }
           }
         } 
-        // Handle WebRTC signaling
         else if (data.type === 'call_offer') {
           if (window.confirm(`Incoming video call! Accept?`)) await answerCall(data.offer);
         } else if (data.type === 'call_answer') {
@@ -199,9 +199,6 @@ function App() {
     }
   };
 
-  // ==========================================
-  // 4. WEBRTC (VIDEO/AUDIO CALL & RECORDING) LOGIC
-  // ==========================================
   const startRecording = async () => { 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -307,7 +304,7 @@ function App() {
   return (
     <div className="app-container">
       
-      {/* STATUS OVERLAY (Full Screen) */}
+      {/* STATUS OVERLAY */}
       {activeStatus && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.95)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ position: 'absolute', top: '20px', right: '30px', color: 'white', fontSize: '30px', cursor: 'pointer' }} onClick={() => setActiveStatus(null)}>✖</div>
@@ -499,5 +496,3 @@ function App() {
 }
 
 export default App;
-
-
