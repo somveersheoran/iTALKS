@@ -11,7 +11,6 @@ from twilio.rest import Client
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
-app = FastAPI()
 
 # CORS Middleware (Ye Vercel ko allow karega)
 app.add_middleware(
@@ -40,7 +39,7 @@ import os
 # Ye ensure karta hai ki Railway wale variables uthayein
 twilio_sid = os.environ.get("TWILIO_ACCOUNT_SID")
 twilio_token = os.environ.get("TWILIO_AUTH_TOKEN")
-twilio_verify_sid = os.environ.get("TWILIO_VERIFY_SID") 
+twilio_verify_sid = os.environ.get("VERIFY_SERVICE_SID") 
 # (Yahan variable ke naam wahi hone chahiye jo tumne Railway mein daale hain)
 # Keys access karo
 # twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
