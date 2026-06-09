@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Ye line ensure karegi ki Railway ka variable use ho, hardcoded link nahi!
-DATABASE_URL = os.environ.get("DATABASE_URL")
+# Railway automatically ye variable dega. Local testing ke liye aage fallback diya hai.
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:iTqzNfbDjhNBJKNLkcuQTXUuvhxSCDGS@postgres.railway.internal:5432/railway")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
