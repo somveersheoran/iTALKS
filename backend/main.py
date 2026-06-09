@@ -10,7 +10,7 @@ from twilio.rest import Client
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
-
+app = FastAPI(title="iTALKS Backend API", description="iTALKS ke liye FastAPI backend jo Twilio Verify API use karta hai OTP ke liye, aur SQLAlchemy for database interactions. WebSocket support bhi hai real-time messaging ke liye.", version="1.0.0")
 
 # CORS Middleware (Ye Vercel ko allow karega)
 app.add_middleware(
