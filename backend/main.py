@@ -8,21 +8,21 @@ from datetime import datetime, timedelta
 from twilio.rest import Client
 
 
-# Agar pehle se app = FastAPI() likha hai toh use waise hi rehne do
-# Usko neeche ye middleware add kar do:
+models.Base.metadata.create_all(bind=engine)
+app = FastAPI()
 
+app = FastAPI()
+
+# CORS Middleware (Ye Vercel ko allow karega)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Ye Vercel, Localhost sabko allow kar dega
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-models.Base.metadata.create_all(bind=engine)
-app = FastAPI()
-
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+#app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 connected_clients = []
 
