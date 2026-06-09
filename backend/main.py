@@ -7,6 +7,18 @@ import json
 from datetime import datetime, timedelta
 from twilio.rest import Client
 
+
+# Agar pehle se app = FastAPI() likha hai toh use waise hi rehne do
+# Usko neeche ye middleware add kar do:
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Ye Vercel, Localhost sabko allow kar dega
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
