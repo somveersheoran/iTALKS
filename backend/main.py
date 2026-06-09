@@ -35,12 +35,19 @@ from dotenv import load_dotenv
 # .env file load karo
 load_dotenv()
 
+import os
+
+# Ye ensure karta hai ki Railway wale variables uthayein
+twilio_sid = os.environ.get("TWILIO_ACCOUNT_SID")
+twilio_token = os.environ.get("TWILIO_AUTH_TOKEN")
+twilio_verify_sid = os.environ.get("TWILIO_VERIFY_SID") 
+# (Yahan variable ke naam wahi hone chahiye jo tumne Railway mein daale hain)
 # Keys access karo
-twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
-twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
-twilio_verify_sid = os.getenv("VERIFY_SERVICE_SID")
-db_url = os.getenv("DATABASE_URL") # Yeh Service SID hai
-# ==========================================
+# twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
+# twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
+# twilio_verify_sid = os.getenv("VERIFY_SERVICE_SID")
+# db_url = os.getenv("DATABASE_URL") # Yeh Service SID hai
+# # ==========================================
 
 @app.post("/send-otp")
 def send_otp(data: dict):
