@@ -4,6 +4,7 @@ import './App.css';
 
 import { auth } from './firebase';
 import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
+const [confirmationResult, setConfirmationResult] = useState(null);
 
 const servers = { iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }] };
 
@@ -15,7 +16,7 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   
   // --- OTP AUTH STATES ---
- const [authStep, setAuthStep] = useState(1); 
+  const [authStep, setAuthStep] = useState(1); 
   const [countryCode, setCountryCode] = useState("+91");
   const [authPhone, setAuthPhone] = useState("");
   const [authOtp, setAuthOtp] = useState("");
@@ -70,29 +71,23 @@ function App() {
   const verifyOTP = async (e) => {
     e.preventDefault();
     try {
+      let phoneNumber;
       if (authStep === 2) {
-        // Firebase verification
         const result = await confirmationResult.confirm(authOtp);
-        // OTP sahi hai, ab backend ko batao
-        const response = await fetch(`${API_BASE_URL}/verify-otp`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: result.user.phoneNumber, username: authUsername })
-        });
-        const data = await response.json();
-        if (data.isNewUser) setAuthStep(3);
-        else { setCurrentUser(data); setAboutText(data.about || "Hey! I am using iTALKS"); }
+        phoneNumber = result.user.phoneNumber;
       } else {
-        // Step 3: Profile Setup
-        const response = await fetch(`${API_BASE_URL}/verify-otp`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ phone: countryCode + authPhone, username: authUsername })
-        });
-        const data = await response.json();
-        setCurrentUser(data);
+        phoneNumber = countryCode + authPhone;
       }
-    } catch (err) { alert("Invalid OTP!"); console.error(err); }
+      
+      const response = await fetch(`${API_BASE_URL}/verify-otp`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phoneNumber, username: authUsername })
+      });
+      const data = await response.json();
+      if (data.isNewUser) setAuthStep(3);
+      else { setCurrentUser(data); setAboutText(data.about || "Hey! I am using iTALKS"); }
+    } catch (err) { alert("Invalid OTP!"); }
   };
-
   // ==========================================
   // 2. PROFILE & STATUS UPLOAD LOGIC
   // ==========================================
