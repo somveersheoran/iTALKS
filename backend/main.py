@@ -36,59 +36,21 @@ load_dotenv()
 
 import os
 
-# Ye ensure karta hai ki Railway wale variables uthayein
-twilio_sid = os.environ.get("TWILIO_ACCOUNT_SID")
-twilio_token = os.environ.get("TWILIO_AUTH_TOKEN")
-twilio_verify_sid = os.environ.get("VERIFY_SERVICE_SID") 
-# (Yahan variable ke naam wahi hone chahiye jo tumne Railway mein daale hain)
-# Keys access karo
-# twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
-# twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
-# twilio_verify_sid = os.getenv("VERIFY_SERVICE_SID")
-# db_url = os.getenv("DATABASE_URL") # Yeh Service SID hai
-# # ==========================================
-
-@app.post("/send-otp")
-def send_otp(data: dict):
-    phone = data.get("phone")
-    client = Client(twilio_sid, twilio_token)
-    
-    try:
-        # Twilio Verify API call - Yeh automatic SMS bhejega
-        client.verify.v2.services(twilio_verify_sid).verifications.create(to=phone, channel='sms')
-        print(f"✅ OTP sent successfully to {phone} using Verify API")
-        return {"message": "OTP sent successfully"}
-    except Exception as e:
-        print(f"❌ Twilio Verify Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
+# Twilio imports aur variables hatado
 @app.post("/verify-otp")
 def verify_otp(data: dict, db: Session = Depends(get_db)):
     phone = data.get("phone")
-    otp = data.get("otp")
     username = data.get("username", "")
     
-    client = Client(twilio_sid, twilio_token)
+    db_user = db.query(models.User).filter(models.User.phone == phone).first()
+    if not db_user:
+        if not username: return {"isNewUser": True}
+        db_user = models.User(username=username, phone=phone, about="Hey! I am using iTALKS")
+        db.add(db_user)
+        db.commit()
+        db.refresh(db_user)
     
-    try:
-        # OTP verify check
-        check = client.verify.v2.services(twilio_verify_sid).verification_checks.create(to=phone, code=otp)
-        
-        if check.status != 'approved':
-            raise HTTPException(status_code=400, detail="Invalid OTP!")
-
-        db_user = db.query(models.User).filter(models.User.phone == phone).first()
-        if not db_user:
-            if not username: return {"isNewUser": True}
-            db_user = models.User(username=username, phone=phone, about="Hey! I am using iTALKS")
-            db.add(db_user)
-            db.commit()
-            db.refresh(db_user)
-        
-        return {"username": db_user.username, "clientId": str(db_user.id), "avatar": db_user.avatar, "about": db_user.about}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
+    return {"username": db_user.username, "clientId": str(db_user.id), "avatar": db_user.avatar, "about": db_user.about}
 # ... (Baki websocket/message routes wahi purane wale hi rahenge)
 
 @app.post("/update-profile")

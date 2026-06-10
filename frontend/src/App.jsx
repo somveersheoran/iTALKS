@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import EmojiPicker from 'emoji-picker-react';
 import './App.css';
 
+import { auth } from './firebase';
+import { RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
+
 const servers = { iceServers: [{ urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] }] };
 
 // 🛑 DYNAMIC API URLs (Localhost hat gaya!)
@@ -12,11 +15,12 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   
   // --- OTP AUTH STATES ---
-  const [authStep, setAuthStep] = useState(1); 
+ const [authStep, setAuthStep] = useState(1); 
   const [countryCode, setCountryCode] = useState("+91");
   const [authPhone, setAuthPhone] = useState("");
   const [authOtp, setAuthOtp] = useState("");
   const [authUsername, setAuthUsername] = useState("");
+  const [confirmationResult, setConfirmationResult] = useState(null); // Firebase handle
 
   // --- PROFILE & ABOUT STATE ---
   const [showProfileView, setShowProfileView] = useState(false);
@@ -54,36 +58,39 @@ function App() {
   const requestOTP = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(`${API_BASE_URL}/send-otp`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: countryCode + authPhone })
-      });
-      if(res.ok) setAuthStep(2);
-      else alert("Failed to send OTP. Check backend.");
-    } catch (err) { alert("Server error: FastAPI is not running or CORS issue."); console.error(err); }
+      if (!window.recaptchaVerifier) {
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 'size': 'invisible' });
+      }
+      const confirmation = await signInWithPhoneNumber(auth, countryCode + authPhone, window.recaptchaVerifier);
+      setConfirmationResult(confirmation);
+      setAuthStep(2);
+    } catch (err) { alert("Error sending OTP: " + err.message); console.error(err); }
   };
 
   const verifyOTP = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${API_BASE_URL}/verify-otp`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: countryCode + authPhone, otp: authOtp, username: authUsername })
-      });
-      const data = await response.json();
-      
-      if (!response.ok) {
-        alert(data.detail || "Verification failed");
-        return;
-      }
-      
-      if (data.isNewUser) {
-        setAuthStep(3);
+      if (authStep === 2) {
+        // Firebase verification
+        const result = await confirmationResult.confirm(authOtp);
+        // OTP sahi hai, ab backend ko batao
+        const response = await fetch(`${API_BASE_URL}/verify-otp`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: result.user.phoneNumber, username: authUsername })
+        });
+        const data = await response.json();
+        if (data.isNewUser) setAuthStep(3);
+        else { setCurrentUser(data); setAboutText(data.about || "Hey! I am using iTALKS"); }
       } else {
+        // Step 3: Profile Setup
+        const response = await fetch(`${API_BASE_URL}/verify-otp`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: countryCode + authPhone, username: authUsername })
+        });
+        const data = await response.json();
         setCurrentUser(data);
-        setAboutText(data.about || "Hey! I am using iTALKS");
       }
-    } catch (err) { alert("Server error. Please check backend."); console.error(err); }
+    } catch (err) { alert("Invalid OTP!"); console.error(err); }
   };
 
   // ==========================================
@@ -259,45 +266,34 @@ function App() {
   if (!currentUser) {
     return (
       <div className="auth-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#626262' }}>
-        <div className="auth-box" style={{ width: '350px', padding: '40px', background: 'white', textAlign: 'center', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-          <h1 style={{ color: '#095f4c', fontSize: '40px', marginBottom: '10px' }}>iTALKS</h1>
-          
+        <div className="auth-box" style={{ width: '350px', padding: '40px', background: 'white', textAlign: 'center', borderRadius: '8px' }}>
+          <h1 style={{ color: '#095f4c', fontSize: '40px' }}>iTALKS</h1>
           {authStep === 1 && (
             <form onSubmit={requestOTP}>
-              <h3 style={{color: '#4a4a4a', marginBottom: '20px'}}>Enter your phone number</h3>
-              <div style={{ display: 'flex', border: '1px solid #ccc', borderRadius: '4px', overflow: 'hidden', marginBottom: '20px' }}>
-                <select style={{ padding: '10px', border: 'none', borderRight: '1px solid #ccc', background: '#f0f2f5', outline: 'none' }} value={countryCode} onChange={e => setCountryCode(e.target.value)}>
-                    <option value="+91">IN +91</option>
-                    <option value="+1">US +1</option>
-                </select>
-                <input type="tel" style={{ flex: 1, padding: '10px', border: 'none', outline: 'none' }} placeholder="9588840661" value={authPhone} onChange={e => setAuthPhone(e.target.value)} required />
-              </div>
-              <button type="submit" style={{ backgroundColor: '#095f4c', color: 'white', border: 'none', padding: '10px 30px', cursor: 'pointer', borderRadius: '4px' }}>Next</button>
+              <div id="recaptcha-container"></div>
+              <select value={countryCode} onChange={e => setCountryCode(e.target.value)}>
+                <option value="+91">IN +91</option><option value="+1">US +1</option>
+              </select>
+              <input type="tel" placeholder="Phone Number" value={authPhone} onChange={e => setAuthPhone(e.target.value)} required />
+              <button type="submit">Next</button>
             </form>
           )}
-
           {authStep === 2 && (
             <form onSubmit={verifyOTP}>
-              <h3 style={{color: '#4a4a4a', marginBottom: '20px'}}>Verify OTP</h3>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-                <input type="text" placeholder="1234" value={authOtp} onChange={e => setAuthOtp(e.target.value)} style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '4px', width: '120px', textAlign: 'center' }} required />
-                <button type="submit" style={{ backgroundColor: '#095f4c', color: 'white', border: 'none', padding: '10px 20px', cursor: 'pointer', borderRadius: '4px' }}>Verify</button>
-              </div>
+              <input type="text" placeholder="Enter OTP" value={authOtp} onChange={e => setAuthOtp(e.target.value)} required />
+              <button type="submit">Verify</button>
             </form>
           )}
-
           {authStep === 3 && (
             <form onSubmit={verifyOTP}>
-              <h3 style={{color: '#4a4a4a', marginBottom: '20px'}}>Profile Setup</h3>
-              <input type="text" placeholder="Enter your name" value={authUsername} onChange={e => setAuthUsername(e.target.value)} style={{ padding: '10px', border: '1px solid #ccc', borderRadius: '4px', width: '80%', marginBottom: '20px' }} required />
-              <button type="submit" style={{ backgroundColor: '#095f4c', color: 'white', border: 'none', padding: '10px 30px', cursor: 'pointer', borderRadius: '4px' }}>Save</button>
+              <input type="text" placeholder="Enter Name" value={authUsername} onChange={e => setAuthUsername(e.target.value)} required />
+              <button type="submit">Save</button>
             </form>
           )}
         </div>
       </div>
     );
   }
-
   // ==========================================
   // UI RENDER: MAIN CHAT APP
   // ==========================================
