@@ -62,10 +62,14 @@ function App() {
       if (!window.recaptchaVerifier) {
         window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 'size': 'invisible' });
       }
+      // Firebase se SMS bhej rahe hain, backend `/send-otp` ki ab zaroorat nahi hai
       const confirmation = await signInWithPhoneNumber(auth, countryCode + authPhone, window.recaptchaVerifier);
       setConfirmationResult(confirmation);
       setAuthStep(2);
-    } catch (err) { alert("Error sending OTP: " + err.message); console.error(err); }
+    } catch (err) { 
+      alert("Error sending OTP: " + err.message); 
+      console.error(err); 
+    }
   };
 
   const verifyOTP = async (e) => {
